@@ -4,6 +4,17 @@
 #include <iterator>
 #include <vector>
 #include <unistd.h>
+#include <sched.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+
+int runtime(void* args){
+  std::vector<char*>* arg = (std::vector<char*>*) args;
+  // first arguement is the binary name used to look up for that binary in system PATH
+  execvp((*arg)[0], (*arg).data()); // run_arg.data() gives the pointer to the arguements array
+  return 1;
+}
 
 // argc is the no of arguments and argv is the pointer to the arguments array
 // pointer
@@ -21,8 +32,19 @@ int main(int argc, char **argv) {
   }
 
   run_arg.push_back(nullptr); // NULL denotes the end of the arguements
+  
+  // malloc points to the start of the created memory
+  auto* stack = (char*)malloc(sizeof(char) * 1024 * 1024); // sizeof char coz char has exactly 1 byte size, 1024*1024 makes it 1MB
+  auto* stackTop = stack + sizeof(char) * 1024 + 1024; // in most architectures stack grows from top to bottom(higher memory address to lower memory address) so this pointer points to top of the stack
+  // clone expects the developer to manage memory for the child process
+  
+  void* arg = static_cast<void*>(&run_arg);// clone expects void* so conver em
+  // we're passing SIGCHLD which notifies the parent when the child exits
+  // runtime is the function that first gets executed in child process
+  // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
+  pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS, arg);
+  waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
+  free(stack); // developer is responsible for managing memory so free it once the process ends
 
-  // first arguement is the binary name used to look up for that binary in system PATH
-  execvp(run_arg[0], run_arg.data()); // run_arg.data() gives the pointer to the arguements array
   return EXIT_SUCCESS;
 }
