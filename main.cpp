@@ -12,6 +12,11 @@
 
 int runtime(void* args){
   std::vector<char*>* arg = (std::vector<char*>*) args;
+
+  // make this mount system private from the outer environment, MS_REC applies this recursively to all files and folders
+  // MS_ = mount flags
+  mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
+
   std::string hostname = "Aegis";
   sethostname(hostname.c_str(), hostname.length());
   // change the root file system to a new file system
@@ -22,8 +27,16 @@ int runtime(void* args){
   // since the CLONE_NEWPID is set this creates a new proc view for this namespace
   mount("proc", "proc", "proc", 0, "");// source, target, filesystem type, flags, extra data
    
-  // first arguement is the binary name used to look up for that binary in system PATH
-  execvp((*arg)[0], (*arg).data()); // run_arg.data() gives the pointer to the arguements array
+  pid_t pid = fork(); // this splits the execution into two (a child and a parent both process continues execution after this point)
+                      // this fork() returns twice 0 for the child process and child's pid for the parent 
+  if (pid == 0) { // both process continue execution, if the process is child it runs the if statement, if it is the parent it executes the else statement
+    // first arguement is the binary name used to look up for that binary in system PATH
+    execvp((*arg)[0], (*arg).data()); // run_arg.data() gives the pointer to the arguements array
+  } else  {
+    waitpid(pid, nullptr, 0); // block until child exits
+    std::cout<<"cleaning up the proc mount"<<std::endl;
+    umount("proc");
+  }
   return 1;
 }
 
@@ -53,7 +66,7 @@ int main(int argc, char **argv) {
   // we're passing SIGCHLD which notifies the parent when the child exits
   // runtime is the function that first gets executed in child process
   // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
-  pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID, arg);
+  pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS, arg);
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
