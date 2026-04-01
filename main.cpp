@@ -8,7 +8,33 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
+#include <filesystem>
+#include <fstream>
 
+// function to set limits using cgroups
+void rule_set(pid_t child_pid) {
+  // create path
+  std::filesystem::path pids_path{"/sys/fs/cgroup/pids/Aegis"};
+  std::filesystem::path memory_path{"/sys/fs/cgroup/memory/Aegis"};
+
+  // create those in the filesystem
+  std::filesystem::create_directories(pids_path);
+  std::filesystem::create_directories(memory_path);
+
+  std::ofstream ofs(pids_path / "cgroup.procs");
+  ofs << std::to_string(child_pid);
+  ofs.close();
+  ofs.open(pids_path / "pids.max");
+  ofs << "3"; // only 3 process are allowed 
+  ofs.close();
+
+  ofs.open(memory_path / "cgroup.procs");
+  ofs << std::to_string(child_pid);
+  ofs.close();
+  ofs.open(memory_path / "memory.limit_in_bytes");
+  ofs << "209715200"; // memory byte limit 200MB
+  ofs.close();
+}
 
 int runtime(void* args){
   std::vector<char*>* arg = (std::vector<char*>*) args;
@@ -67,6 +93,7 @@ int main(int argc, char **argv) {
   // runtime is the function that first gets executed in child process
   // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
   pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS, arg);
+  rule_set(child_process_id); // set cgroup limits for this process
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
