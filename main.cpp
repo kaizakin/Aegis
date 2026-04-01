@@ -7,10 +7,21 @@
 #include <sched.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/mount.h>
 
 
 int runtime(void* args){
   std::vector<char*>* arg = (std::vector<char*>*) args;
+  std::string hostname = "Aegis";
+  sethostname(hostname.c_str(), hostname.length());
+  // change the root file system to a new file system
+  chroot("/home/karthik/Projects/Aegis/ubuntu-file-system");
+  // bring the working dir to currect fake root
+  chdir("/");
+
+  // since the CLONE_NEWPID is set this creates a new proc view for this namespace
+  mount("proc", "proc", "proc", 0, "");// source, target, filesystem type, flags, extra data
+   
   // first arguement is the binary name used to look up for that binary in system PATH
   execvp((*arg)[0], (*arg).data()); // run_arg.data() gives the pointer to the arguements array
   return 1;
@@ -20,7 +31,7 @@ int runtime(void* args){
 // pointer
 int main(int argc, char **argv) {
   std::vector<std::string> args(argv + 1, argv + argc); // first argument is the binary name
-  std::cout << "Got first Arguement...\n";
+  std::cout << "Running Arguement: ";
   std::copy(args.begin(), args.end(), std::ostream_iterator<std::string>(std::cout, " ")); // copy args and print it to output stream we use iostream
   // iterator coz std::copy expects an iterator not stream
   std::cout << std::flush;
@@ -42,7 +53,7 @@ int main(int argc, char **argv) {
   // we're passing SIGCHLD which notifies the parent when the child exits
   // runtime is the function that first gets executed in child process
   // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
-  pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS, arg);
+  pid_t child_process_id = clone(runtime, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID, arg);
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
