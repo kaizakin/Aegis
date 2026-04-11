@@ -83,34 +83,41 @@ int Container::child_func(void* arg) {
 }
 
 
+// cgroups v2
+// Order matters in v2
+// 1. create cgroup
+// 2. Enable controllers
+// 3. set limits
+// 4. add process
 void Container::apply_cgroups(pid_t pid) {
   
   namespace fs = std::filesystem;
   // create path
-  fs::path pids_path{"/sys/fs/cgroup/pids/Aegis"};
-  fs::path memory_path{"/sys/fs/cgroup/memory/Aegis"};
+  fs::path cg_path{"/sys/fs/cgroup/Aegis"};
 
   // create those in the filesystem
-  fs::create_directories(pids_path);
-  fs::create_directories(memory_path);
+  fs::create_directories(cg_path);
 
   std::ofstream ofs;
 
+  // in v2 controllers are not enabled by default
+  // enabling controllers (required in v2)
+  ofs.open("/sys/fs/cgroup/cgroup.subtree_control");
+  ofs << "+pids +memory";
+  ofs.close();
+
   // limit no of processes
-  ofs.open(pids_path / "cgroup.procs");
-  ofs << std::to_string(pid);
+  ofs.open(cg_path / "pids.max");
+  ofs << "3";
   ofs.close();
 
-  ofs.open(pids_path / "pids.max");
-  ofs << "3"; // only 3 process are allowed 
-  ofs.close();
-
-  ofs.open(memory_path / "cgroup.procs");
-  ofs << std::to_string(pid);
-  ofs.close();
-
-  ofs.open(memory_path / "memory.limit_in_bytes");
+  ofs.open(cg_path / "memory.max");
   ofs << "209715200"; // memory byte limit 200MB
+  ofs.close();
+
+  // add process to cgroup
+  ofs.open(cg_path / "cgroup.procs");
+  ofs << std::to_string(pid);
   ofs.close();
 }
 
