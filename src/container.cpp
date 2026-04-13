@@ -1,4 +1,5 @@
 #include "container.hpp"
+#include "network.hpp"
 
 #include <iostream>
 #include <vector>
@@ -14,6 +15,10 @@
 
 // constructor
 Container::Container(const Config& config) : config_(config) {}
+
+static void cmd(const std::string& c){
+  system(c.c_str());
+}
 
 
 void Container::setup_env() {
@@ -51,6 +56,10 @@ void Container::setup_env() {
 int Container::child_func(void* arg) {
    Container* container = static_cast<Container*>(arg);
 
+   cmd("ip link set lo up") ; // bring up the loopback interface
+   cmd("ip link set veth1 up"); 
+   cmd("ip addr add 10.0.0.2/24 dev veth1"); 
+   cmd("ip route add default via 10.0.0.1");
    // setup container environment
    container->setup_env();
 
@@ -136,16 +145,21 @@ int Container::run() {
   // SIGCHLD notifies the parent when the child exits
   // child_func is the function that first gets executed in child process
   // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
-  pid_t child_process_id = clone(child_func, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS, this); // this passes the pointer to the current object
+  pid_t child_process_id = clone(child_func, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET, this); // this passes the pointer to the current object
   if (child_process_id == -1) {
     perror("clone failed");
     free(stack);
     return 1;
   }
 
+  Network network(child_process_id);
+  network.setup(); // setup network for container 
+
   apply_cgroups(child_process_id);
 
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
+
+  network.teardown(); // child has exited, so it's safe to clear up the networking state
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
   return 0;
