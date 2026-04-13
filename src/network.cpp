@@ -29,8 +29,8 @@ void Network::setup(){
   cmd("ip link add " + veth_host + " type veth peer name " + veth_container); // create a cable
   cmd("ip link set " + veth_container + " netns " + std::to_string(pid)); // push one end to the container
 
-  cmd("brctl addbr " + bridge); // create a switch
-  cmd("brctl addif " + bridge + " " + veth_host); // plug host end of the cable in the switch
+  cmd("ip link add name " + bridge + " type bridge"); // create a bridge
+  cmd("ip link set " + veth_host + " master " + bridge); // attach host veth to the bridge
 
   //power on both the interfaces
   cmd("ip link set " + veth_host + " up");
@@ -59,5 +59,5 @@ void Network::teardown() {
   cmd("ip link set " + bridge + " down");
 
   // delete bridge
-  cmd("brctl delbr " + bridge);
+  cmd("ip link delete " + bridge + " type bridge");
 }
