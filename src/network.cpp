@@ -10,7 +10,10 @@ static void cmd(const std::string& c){
 // constructor
 Network::Network(pid_t pid) : pid(pid) {
   veth_host = "veth0_" + std::to_string(pid);
-  veth_container = "veth1_" + std::to_string(pid);
+
+  // Only the host-side name needs to be unique per container.
+  // container side gets its own network so there is no need for unique name.
+  veth_container = "veth1";
   bridge = "bridge_" + std::to_string(pid); // real production runtime would reuse bridge but lazy ass me just creating a bridge for every container
 }
 
@@ -51,4 +54,3 @@ void Network::teardown() {
   // delete bridge
   cmd("brctl delbr " + bridge);
 }
-
