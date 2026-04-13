@@ -6,6 +6,7 @@
 class Network {
 public:
   Network(pid_t pid);
+  ~Network(); // desctructor
 
   void setup();
   void teardown();

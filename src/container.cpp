@@ -187,7 +187,9 @@ int Container::run() {
 
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
 
-  network.teardown(); // child has exited, so it's safe to clear up the networking state
+  // network.teardown(); // child has exited, so it's safe to clear up the networking state
+  // teardown will be called automatically in desctructor
+
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
   return 0;

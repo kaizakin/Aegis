@@ -17,6 +17,13 @@ Network::Network(pid_t pid) : pid(pid) {
   bridge = "bridge_" + std::to_string(pid); // real production runtime would reuse bridge but lazy ass me just creating a bridge for every container
 }
 
+// RAII (Resource Acquisition Is Initialization)
+// lifecycle of resources is tied to the lifecycle of the object
+
+Network::~Network(){
+  teardown(); 
+}
+
 // create a virutal ethernet to establish internet connection to containers
 void Network::setup(){
   cmd("ip link add " + veth_host + " type veth peer name " + veth_container); // create a cable
