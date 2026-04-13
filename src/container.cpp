@@ -13,6 +13,12 @@
 #include <filesystem>
 #include <fstream>
 
+struct ChildArgs {
+    int read_fd;
+    int write_fd;
+    Container* container;
+};
+
 // constructor
 Container::Container(const Config& config) : config_(config) {}
 
@@ -54,17 +60,25 @@ void Container::setup_env() {
 
 // child function for clone()
 int Container::child_func(void* arg) {
-   Container* container = static_cast<Container*>(arg);
+//   Container* container = static_cast<Container*>(arg);
+   ChildArgs* args = (ChildArgs*)arg;
+
+   close(args->write_fd); // close unused write fd
+
+   char buf;
+   read(args->read_fd, &buf, 1); // BLOCK until a byte is read
+
+   close(args->read_fd);
 
    cmd("ip link set lo up") ; // bring up the loopback interface
    cmd("ip link set veth1 up"); 
    cmd("ip addr add 10.0.0.2/24 dev veth1"); 
    cmd("ip route add default via 10.0.0.1");
    // setup container environment
-   container->setup_env();
+   args->container->setup_env();
 
    std::vector<char*> argv;
-   for(auto& str : container->config_.command){
+   for(auto& str : args->container->config_.command){
      argv.push_back(const_cast<char*>(str.c_str()));
    }
    argv.push_back(NULL);
@@ -141,21 +155,35 @@ int Container::run() {
   }
   auto* stackTop = stack + stack_size; // in most architectures stack grows from top to bottom(higher memory address to lower memory address) so this pointer points to top of the stack
   // clone expects the developer to manage memory for the child process
+
+  // child needs to wait until parent sets up network 
+  // use pipe to block and notify once the network setup is complte
+  int fd[2];
+  pipe(fd);
+
+  ChildArgs args = { fd[0], fd[1], this };
   
   // SIGCHLD notifies the parent when the child exits
   // child_func is the function that first gets executed in child process
   // CLONE_NEWUTS creates a new uts namespace (new hostname) and arg is the arguments that the child process gets
-  pid_t child_process_id = clone(child_func, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET, this); // this passes the pointer to the current object
+  pid_t child_process_id = clone(child_func, stackTop, SIGCHLD | CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET, &args); // this passes the pointer to the current object
   if (child_process_id == -1) {
     perror("clone failed");
     free(stack);
     return 1;
   }
 
+  close(fd[0]); // close unused read end in the parent side (avoid unecessary errors)
+
   Network network(child_process_id);
   network.setup(); // setup network for container 
 
   apply_cgroups(child_process_id);
+
+  write(fd[1], "x", 1); // send data thru pipe to let child know network setup is done
+
+  close(fd[1]); // close it once the write is done
+
 
   waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
 
