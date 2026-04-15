@@ -58,7 +58,8 @@ void Network::teardown() {
   cmd("iptables -D FORWARD -o " + bridge + " -m state --state RELATED,ESTABLISHED -j ACCEPT");
 
   // delete veth pair this removes both ends
-  cmd("ip link delete " + veth_host);
+  // cmd("ip link delete " + veth_host);
+  // kernel automatically removes it so no need for manual cleanup
 
   // bring the bridge down
   cmd("ip link set " + bridge + " down");
