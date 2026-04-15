@@ -211,5 +211,8 @@ int Container::run() {
 
   utils::cmd("umount /tmp/aegis/merged"); // cleanup
 
+  utils::cmd("rmdir /tmp/aegis  --ignore-fail-on-non-empty");
+  std::cout<<"/tmp/aegis cleaned up" << std::endl;
+
   return 0;
 }
