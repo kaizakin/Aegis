@@ -32,6 +32,10 @@ void Network::setup(){
   cmd("ip link set " + veth_host + " up");
   cmd("ip link set " + bridge + " up");
 
+  // enable IP forwarding
+  // so host acts like a router between container and internet
+  cmd("sudo sysctl -w net.ipv4.ip_forward=1");
+
   cmd("ip addr add 10.0.0.1/24 dev " + bridge); // assign an ip address to the bridge
   // bridge is gonna act as a gateway that route requests back and forth of the container and the host 
   // so give it a private ip
@@ -41,6 +45,11 @@ void Network::setup(){
 
   // Allow established traffic to come back from the main interface to our bridge
   cmd("iptables -A FORWARD -o " + bridge + " -m state --state RELATED,ESTABLISHED -j ACCEPT");
+
+  // for every network request coming from container rewrite container ip with host ip
+  // so the response actually reaches back the host
+  // internet doesn't know how to send response to private ip
+  cmd("sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o wlan0 -j MASQUERADE");
 }
 
 void Network::teardown() {
