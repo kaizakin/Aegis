@@ -182,7 +182,16 @@ int Container::run() {
   close(fd[1]); // close it once the write is done
 
 
-  waitpid(child_process_id, nullptr, 0);// wait until child exits, ignore exit status, 0 => block until done 
+  int status;
+  waitpid(child_process_id, &status, 0);// wait until child exits, 0 => block until done 
+  
+  if(WIFSIGNALED(status)) { // wait if signalled (if the process died with a signal)
+    int sig = WTERMSIG(status); // wait termination signal
+    std::cout << "child killed by signal " << sig;
+    if (sig == 9) std::cout << "SIGKILL - likely out of memory" << std::endl;
+  } else if(WIFEXITED(status)) {
+    std::cout<< "Child exited with code " << WEXITSTATUS(status) << std::endl;
+  }
 
   // network.teardown(); // child has exited, so it's safe to clear up the networking state
   // teardown will be called automatically in desctructor
