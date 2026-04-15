@@ -1,5 +1,6 @@
 #include "container.hpp"
 #include "network.hpp"
+#include "utils.hpp"
 
 #include <iostream>
 #include <vector>
@@ -21,11 +22,6 @@ struct ChildArgs {
 
 // constructor
 Container::Container(const Config& config) : config_(config) {}
-
-static void cmd(const std::string& c){
-  system(c.c_str());
-}
-
 
 void Container::setup_env() {
   // make this mount system private from the outer environment, MS_REC applies this recursively to all files and folders
@@ -70,10 +66,11 @@ int Container::child_func(void* arg) {
 
    close(args->read_fd);
 
-   cmd("ip link set lo up") ; // bring up the loopback interface
-   cmd("ip link set veth1 up"); 
-   cmd("ip addr add 10.0.0.2/24 dev veth1"); 
-   cmd("ip route add default via 10.0.0.1");
+   utils::cmd("ip link set lo up") ; // bring up the loopback interface
+   utils::cmd("ip link set veth1 up"); 
+   utils::cmd("ip addr add 10.0.0.2/24 dev veth1"); 
+   utils::cmd("ip route add default via 10.0.0.1");
+
    // setup container environment
    args->container->setup_env();
 

@@ -1,11 +1,7 @@
 #include "network.hpp"
-#include <cstdlib>
+#include "utils.hpp"
 
-// system runs a command just like how it is run in terminal
-// it creates a bash process runs the command and waits for the result
-static void cmd(const std::string& c){
-  system(c.c_str());
-}
+using utils::cmd;
 
 // constructor
 Network::Network(pid_t pid) : pid(pid) {
