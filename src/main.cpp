@@ -19,36 +19,48 @@ int main(int argc, char **argv) {
   // std::cout << std::flush;
   // execvp C API expect char*[] so convert vector to c compatible format
 
-  // root directory for container
-  utils::cmd("mkdir -p /tmp/aegis_root/bin /tmp/aegis_root/proc /tmp/aegis_root/lib /tmp/aegis_root/lib64 /tmp/aegis_root/usr/bin");
+  // overlayFS
+  // Base dir
+  utils::cmd("mkdir -p /tmp/aegis/lower /tmp/aegis/upper /tmp/aegis/work /tmp/aegis/merged");
+
+  // base filesystem in lowerdir
+  utils::cmd("mkdir -p /tmp/aegis/lower/bin /tmp/aegis/lower/proc /tmp/aegis/lower/lib /tmp/aegis/lower/lib64 /tmp/aegis/lower/usr/bin");
 
   // A list of essential binaries for container
   const std::vector<std::string> bins = {"/bin/bash", "/bin/ps", "/bin/hostname", "/bin/ls", "/bin/ip", "/bin/ping"};
 
   for(const auto& bin : bins) {
-    // copy binary inside container
-    utils::cmd("cp " + bin + " /tmp/aegis_root/bin");
+    // copy binary inside container (lower dir)
+    utils::cmd("cp " + bin + " /tmp/aegis/lower/bin");
 
     // command to find and copy all shared library dependencies for the binary
-    std::string ldd_cmd = "ldd " + bin + " | grep -oE '/[^ ]+'" + " | xargs -I '{}' cp --parents '{}' /tmp/aegis_root/";
+    std::string ldd_cmd = "ldd " + bin + " | grep -oE '/[^ ]+' | xargs -I '{}' cp --parents '{}' /tmp/aegis/lower/";
     utils::cmd(ldd_cmd);
   }
 
   // this is responsible for loading and linking shared libraries at runtime
-  utils::cmd("cp /lib64/ld-linux-x86-64.so.2 /tmp/aegis_root/lib64/");
+  utils::cmd("cp /lib64/ld-linux-x86-64.so.2 /tmp/aegis/lower/lib64/");
 
   // python executable
-  utils::cmd("cp /usr/bin/python3 /tmp/aegis_root/usr/bin/");
+  utils::cmd("cp /usr/bin/python3 /tmp/aegis/lower/usr/bin/");
 
-
-  utils::cmd("mkdir -p /tmp/aegis_root/etc");
   // dns config 
-  utils::cmd("cp /etc/resolv.conf /tmp/aegis_root/etc/");
+  utils::cmd("mkdir -p /tmp/aegis/lower/etc");
+  utils::cmd("cp /etc/resolv.conf /tmp/aegis/lower/etc/");
 
+  // merged becomes the combined filesystem view
+  std::string overlay_mount =
+    "mount -t overlay overlay "
+    "-o lowerdir=/tmp/aegis/lower,"
+    "upperdir=/tmp/aegis/upper,"
+    "workdir=/tmp/aegis/work "
+    "/tmp/aegis/merged";
+
+  utils::cmd(overlay_mount);
 
   Config config;
   config.hostname = "Aegis";
-  config.rootfs = "/tmp/aegis_root";
+  config.rootfs = "/tmp/aegis/merged";
 
   for(int i=1; i<argc; i++) {
     config.command.push_back(argv[i]);

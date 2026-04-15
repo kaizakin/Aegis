@@ -209,5 +209,7 @@ int Container::run() {
 
   free(stack); // developer is responsible for managing memory so free it once the process ends
 
+  utils::cmd("umount /tmp/aegis/merged"); // cleanup
+
   return 0;
 }
