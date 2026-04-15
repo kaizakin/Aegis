@@ -23,27 +23,27 @@ int main(int argc, char **argv) {
   utils::cmd("mkdir -p /tmp/aegis_root/bin /tmp/aegis_root/proc /tmp/aegis_root/lib /tmp/aegis_root/lib64 /tmp/aegis_root/usr/bin");
 
   // A list of essential binaries for container
-  const std::vector<std::string> bins = {"/bin/bash", "/bin/ps", "/bin/hostname", "/bin/ls", "/bin/ip", "/bin/ping" };
+  const std::vector<std::string> bins = {"/bin/bash", "/bin/ps", "/bin/hostname", "/bin/ls", "/bin/ip", "/bin/ping"};
 
   for(const auto& bin : bins) {
     // copy binary inside container
-    utils::cmd("cp " + bin + "/tmp/aegis_root/bin");
+    utils::cmd("cp " + bin + " /tmp/aegis_root/bin");
 
     // command to find and copy all shared library dependencies for the binary
-    std::string ldd_cmd = "ldd " + bin + " | grep '=> /' | awk '{print $3}' | xargs -I '{}' cp '{}' /tmp/my_root/lib/";
+    std::string ldd_cmd = "ldd " + bin + " | grep -oE '/[^ ]+'" + " | xargs -I '{}' cp --parents '{}' /tmp/aegis_root/";
     utils::cmd(ldd_cmd);
   }
 
   // this is responsible for loading and linking shared libraries at runtime
-  utils::cmd("cp /lib64/ld-linux-x86-64.so.2 /tmp/my_root/lib64/");
+  utils::cmd("cp /lib64/ld-linux-x86-64.so.2 /tmp/aegis_root/lib64/");
 
   // python executable
-  utils::cmd("cp /usr/bin/python3 /tmp/my_root/usr/bin/");
+  utils::cmd("cp /usr/bin/python3 /tmp/aegis_root/usr/bin/");
 
 
-  utils::cmd("mkdir -p /tmp/my_root/etc");
+  utils::cmd("mkdir -p /tmp/aegis_root/etc");
   // dns config 
-  utils::cmd("cp /etc/resolv.conf /tmp/my_root/etc/");
+  utils::cmd("cp /etc/resolv.conf /tmp/aegis_root/etc/");
 
 
   Config config;
