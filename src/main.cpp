@@ -1,5 +1,9 @@
 #include "container.hpp"
+#include "utils.hpp"
+#include "string"
+
 #include <iostream>
+
 
 // argc is the no of arguments and argv is the pointer to the arguments array
 // pointer
@@ -14,10 +18,37 @@ int main(int argc, char **argv) {
   // iterator coz std::copy expects an iterator not stream
   // std::cout << std::flush;
   // execvp C API expect char*[] so convert vector to c compatible format
-  
+
+  // root directory for container
+  utils::cmd("mkdir -p /tmp/aegis_root/bin /tmp/aegis_root/proc /tmp/aegis_root/lib /tmp/aegis_root/lib64 /tmp/aegis_root/usr/bin");
+
+  // A list of essential binaries for container
+  const std::vector<std::string> bins = {"/bin/bash", "/bin/ps", "/bin/hostname", "/bin/ls", "/bin/ip", "/bin/ping" };
+
+  for(const auto& bin : bins) {
+    // copy binary inside container
+    utils::cmd("cp " + bin + "/tmp/aegis_root/bin");
+
+    // command to find and copy all shared library dependencies for the binary
+    std::string ldd_cmd = "ldd " + bin + " | grep '=> /' | awk '{print $3}' | xargs -I '{}' cp '{}' /tmp/my_root/lib/";
+    utils::cmd(ldd_cmd);
+  }
+
+  // this is responsible for loading and linking shared libraries at runtime
+  utils::cmd("cp /lib64/ld-linux-x86-64.so.2 /tmp/my_root/lib64/");
+
+  // python executable
+  utils::cmd("cp /usr/bin/python3 /tmp/my_root/usr/bin/");
+
+
+  utils::cmd("mkdir -p /tmp/my_root/etc");
+  // dns config 
+  utils::cmd("cp /etc/resolv.conf /tmp/my_root/etc/");
+
+
   Config config;
   config.hostname = "Aegis";
-  config.rootfs = "/home/karthik/Projects/Aegis/ubuntu-file-system";
+  config.rootfs = "/tmp/aegis_root";
 
   for(int i=1; i<argc; i++) {
     config.command.push_back(argv[i]);
