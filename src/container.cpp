@@ -13,6 +13,8 @@
 #include <sys/mount.h>
 #include <filesystem>
 #include <fstream>
+#include <sys/stat.h>
+#include <sys/syscall.h>
 
 struct ChildArgs {
     int read_fd;
@@ -31,16 +33,21 @@ void Container::setup_env() {
     exit(1);
   }
 
+  // pivot root has a requirement since it changes the mount points it needs the new root to be a mount point
+  // so create a mount the directory to the same location so kernel treats it as a mount point instead of just a normal directory
+  mount(config_.rootfs.c_str(), config_.rootfs.c_str(), NULL, MS_BIND, NULL);
+
+  // temporary dir for pivot root to put host root
+  mkdir((config_.rootfs + "/old_root").c_str(), 0755);
+
+  // pivot root 
+  syscall(SYS_pivot_root, config_.rootfs.c_str(), (config_.rootfs + "/old_root").c_str());
 
   if (sethostname(config_.hostname.c_str(), config_.hostname.length()) == -1) {
     perror("sethostname failed");
     exit(1);
   }
-  // change the root file system to a new file system
-  if (chroot(config_.rootfs.c_str()) == -1) {
-    perror("chroot failed");
-    exit(1);
-  }
+
   // bring the working dir to currect fake root
   if (chdir("/") == -1) {
     perror("chdir failed");
@@ -52,6 +59,10 @@ void Container::setup_env() {
     perror("mount proc failed");
     exit(1);
   }
+
+  // remove the mounted host root for safety reasons
+  umount2("/old_root", MNT_DETACH);
+  rmdir("/old_root");
 }
 
 // child function for clone()
