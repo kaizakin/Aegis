@@ -4,6 +4,8 @@ Aegis is a small Linux container runtime prototype written in C++.
 
 The goal of this project is simple: understand how containers work by building the core pieces directly with Linux primitives instead of relying on higher-level tooling.
 
+https://github.com/user-attachments/assets/0f51195c-f045-4949-a614-2a4ccd763f00
+
 ## What It Does
 
 - takes a command from the CLI
